@@ -10,6 +10,7 @@ Dev pipline is delivering apk to telegram chat and testflight. Main pipeline del
 
 ## Requirements
 Gitlab runnner on Mac is required
+
 [fastline](https://fastlane.tools/)
 
 ## Variables:
