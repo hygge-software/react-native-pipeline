@@ -1,0 +1,111 @@
+stages:
+  - prebuild
+  - build
+  - deploy
+
+prebuild:dev:
+  stage: prebuild
+  script:
+    - echo "$ENV_DEV" > ./src/env.json
+  artifacts:
+    paths:
+      - ./src/env.json
+  only:
+    - dev
+
+prebuild:prod:
+  stage: prebuild
+  script:
+    - echo "$ENV_PROD" > ./src/env.json
+  artifacts:
+    paths:
+      - ./src/env.json
+  only:
+    - master
+
+.ios:
+  before_script:
+    - npm install
+    - cd ios
+    - bundle install --path ~/.gem
+    - gem install cocoapods --force --user-install
+    - pod install
+
+.android:
+  image: reactnativecommunity/react-native-android
+  variables:
+    NDK_VERSION: 20.0.5594570
+  before_script:
+    - sh gem-bundle.sh
+    - yarn install
+
+build_android:dev:
+  stage: build
+  extends:
+    - .android
+  script:
+    - cd android && chmod +x gradlew
+    - ./gradlew assembleRelease
+  artifacts:
+    paths:
+      - android/app/build/outputs/
+  only:
+    - dev
+
+build_android:prod:
+  stage: build
+  extends:
+    - .android
+  script:
+    - cd android && chmod +x gradlew
+    - bundle exec fastlane buildRelease
+  artifacts:
+    paths:
+      - android/app/build/outputs/
+  only:
+    - master
+
+deploy_android:dev:
+  stage: deploy
+  script:
+    - curl -F document=@"android/app/build/outputs/apk/release/app-release.apk" https://api.telegram.org/$BOT_ID/sendDocument?chat_id=$CHAT_ID
+  only:
+    - dev
+
+deploy_android:prod:
+  stage: deploy
+  extends:
+    - .android
+  script:
+    - cd android
+    - touch key.json
+    - echo "$PLAY_STORE_JSON_KEY" > ./key.json
+    - bundle exec fastlane supply init
+    - bundle exec fastlane deployInternal
+  only:
+    - master
+
+build_ios:dev:
+  stage: build
+  extends:
+    - .ios
+  tags:
+    - ios
+  script:
+    - bundle exec fastlane buildDebug
+  artifacts:
+    paths:
+      - ios/build/LiveMySteps.ipa
+  only:
+    - dev
+
+deploy_ios:dev:
+  stage: deploy
+  extends:
+    - .ios
+  tags:
+    - ios
+  script:
+    - bundle exec fastlane beta
+  only:
+    - dev
